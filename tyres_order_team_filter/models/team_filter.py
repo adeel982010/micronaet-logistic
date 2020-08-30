@@ -29,6 +29,9 @@ from odoo import api, fields, models, tools, exceptions, SUPERUSER_ID
 from odoo.addons import decimal_precision as dp
 from odoo.tools.translate import _
 
+_logger = logging.getLogger(__name__)
+
+
 class CrmTeam(models.Model):
     """ Team setup (force default function)
     """
@@ -125,14 +128,20 @@ class ResUsers(models.Model):
             domain = str(domain)
         else:
             domain = '%s, %s'  % (action[:-1], domain[1:])
-
+        try:    
+            view_id = origin_action.view_id.id
+        except:
+            _logger.error(
+                'Cannot found view for action: %s' % origin_action.name)
+            return False
+            
         return action_pool.create({
             'name': name,
             'type': origin_action.type,
             'help': origin_action.help,
             'binding_model_id': origin_action.binding_model_id.id,
             'binding_type': origin_action.binding_type,
-            'view_id': origin_action.view_id.id,
+            'view_id': view_id,
             'domain': domain,
             'context': origin_action.context,
             'res_id': origin_action.res_id,
@@ -239,6 +248,10 @@ class ResUsers(models.Model):
             my_action_id = self.create_my_action(
                 domain, menu.action, 'My action: %s' % name)
             
+            if not my_action_id:
+                _logger.error('Menu non created!')
+                continue
+                
             # Create menu:
             my_menu_id = self.create_my_menu(
                 my_action_id, my_group_id, name, template.sequence)

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 ###############################################################################
 #
-# ODOO (ex OpenERP) 
+# ODOO (ex OpenERP)
 # Open Source Management Solution
 # Copyright (C) 2001-2015 Micronaet S.r.l. (<https://micronaet.com>)
 # Developer: Nicola Riolini @thebrush (<https://it.linkedin.com/in/thebrush>)
@@ -13,7 +13,7 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 # See the GNU Affero General Public License for more details.
 #
 # You should have received a copy of the GNU Affero General Public License
@@ -32,15 +32,16 @@ from odoo.tools.translate import _
 
 _logger = logging.getLogger(__name__)
 
+
 class StockPickingInReportWizard(models.TransientModel):
     """ Model name: Delivered in report
     """
     _name = 'stock.picking.in.report.wizard'
     _description = 'Delivered report'
-    
+
     # -------------------------------------------------------------------------
     #                            COLUMNS:
-    # -------------------------------------------------------------------------    
+    # -------------------------------------------------------------------------
     supplier_id = fields.Many2one('res.partner', 'Supplier')
     from_date = fields.Date('From date >=', required=True)
     to_date = fields.Date('To date <', required=True)
@@ -52,16 +53,16 @@ class StockPickingInReportWizard(models.TransientModel):
         ('date', 'Delivery report'),
         ('pfu', 'PFU report'),
         ], 'Report mode', default='pfu', required=True)
-        
-    # -------------------------------------------------------------------------    
+
+    # -------------------------------------------------------------------------
 
     @api.multi
     def extract_load_report(self):
-        ''' Extract Excel report
-        '''        
+        """ Extract Excel report
+        """
         move_pool = self.env['stock.move']
         excel_pool = self.env['excel.writer']
-        
+
         # Wizard parameters:
         from_date = self.from_date
         to_date = self.to_date
@@ -70,53 +71,54 @@ class StockPickingInReportWizard(models.TransientModel):
         exclude_country_id = self.exclude_country_id.id
         sort = self.sort
         nothing = '/'
-        
+
         domain = [
             # Header
             ('create_date', '>=', '%s 00:00:00' % from_date),
             ('create_date', '<', '%s 00:00:00' % to_date),
-            ('logistic_load_id', '!=', False), # Load stock move only
-            ]
-
+            ('logistic_load_id', '!=', False),  # Load stock move only
+            ('logistic_load_id.order_id.logistic_source', 'not in', (
+                'refund', )),  # Not refund
+        ]
         if supplier:
             domain.append(
                 ('partner_id', '=', supplier.id),
                 )
-                
+
         if exclude_fiscal_id:
             domain.append(
-                ('logistic_purchase_id.order_id.partner_id.property_account_position_id', '!=', 
+                ('logistic_purchase_id.order_id.partner_id.property_account_position_id', '!=',
                     exclude_fiscal_id),
                 )
 
         if exclude_country_id:
             domain.append(
-                ('logistic_purchase_id.order_id.partner_id.country_id', '!=', 
+                ('logistic_purchase_id.order_id.partner_id.country_id', '!=',
                     exclude_country_id),
                 )
-            
+
         # ---------------------------------------------------------------------
         #                          EXTRACT EXCEL:
         # ---------------------------------------------------------------------
         # Excel file configuration: # TODO
         header = (
-            'Fornitore', 'Data', 'Documento', 'Tipo',            
+            'Fornitore', 'Data', 'Documento', 'Tipo',
             'Codice', 'Prodotto', 'PFU cat.',
             'Q.', 'Prezzo', 'Subtotal',
             )
         column_width = (
-            30, 10, 20, 10,            
+            30, 10, 20, 10,
             18, 40, 15,
             10, 10, 15,
             )
 
         # ---------------------------------------------------------------------
         # Write detail:
-        # ---------------------------------------------------------------------        
+        # ---------------------------------------------------------------------
         structure = {}
         summary = {}
         summary_name = 'Sommario'
-        excel_pool.create_worksheet(summary_name)        
+        excel_pool.create_worksheet(summary_name)
 
         moves = move_pool.search(domain)
         for move in moves:
@@ -125,8 +127,8 @@ class StockPickingInReportWizard(models.TransientModel):
             supplier = move.logistic_purchase_id.order_id.partner_id
             if supplier not in structure:
                 structure[supplier] = []
-            structure[supplier].append(move)    
-        
+            structure[supplier].append(move)
+
         if not structure:
             _logger.warning('Delivery not found!')
             raise exceptions.Warning(_('No document found with this filters!'))
@@ -144,12 +146,12 @@ class StockPickingInReportWizard(models.TransientModel):
                 excel_pool.create_worksheet(ws_name)
             except:
                 _logger.error('Sheet %s yet present!' % ws_name)
-                
+
             excel_pool.column_width(ws_name, column_width)
             if not setup_complete: # First page only:
                 setup_complete = True
                 excel_pool.set_format()
-                format_text = {                
+                format_text = {
                     'title': excel_pool.get_format('title'),
                     'header': excel_pool.get_format('header'),
                     'white': {
@@ -159,12 +161,12 @@ class StockPickingInReportWizard(models.TransientModel):
                     'red': {
                         'text': excel_pool.get_format('bg_normal_red'),
                         'number': excel_pool.get_format(
-                            'bg_normal_red_number'),                        
+                            'bg_normal_red_number'),
                         },
                     'green': {
                         'text': excel_pool.get_format('bg_green'),
                         'number': excel_pool.get_format(
-                            'bg_green_number'),                        
+                            'bg_green_number'),
                         },
                     }
 
@@ -179,45 +181,46 @@ class StockPickingInReportWizard(models.TransientModel):
                     to_date,
                     )
                 ], default_format=format_text['title'])
-                
+
             row += 2
-            excel_pool.write_xls_line(ws_name, row, header, 
+            excel_pool.write_xls_line(
+                ws_name, row, header,
                 default_format=format_text['header'])
 
             total = {
-                'subtotal': {},                
-                'quantity': {},                
+                'subtotal': {},
+                'quantity': {},
                 }
-            
+
             if sort == 'date':
                 structure_sorted = sorted(
-                    structure[supplier], 
+                    structure[supplier],
                     key=lambda x: x.create_date,
                     )
-            else: # PFU        
+            else:  # PFU
                 structure_sorted = sorted(
-                    structure[supplier], 
+                    structure[supplier],
                     key=lambda x: (
-                        x.product_id.mmac_pfu.name or nothing, 
+                        x.product_id.mmac_pfu.name or nothing,
                         x.create_date,
                         ))
-                    
+
             for move in structure_sorted:
                 row += 1
-                product = move.product_id             
+                product = move.product_id
                 mmac_pfu = product.mmac_pfu.name or nothing
 
                 logistic_purchase = move.logistic_purchase_id
                 logistic_load = move.logistic_load_id
                 order = logistic_load.order_id
-                
+
                 # -------------------------------------------------------------
-                # Total:    
+                # Total:
                 # -------------------------------------------------------------
                 if mmac_pfu not in total['subtotal']:
                     total['subtotal'][mmac_pfu] = 0.0
                     total['quantity'][mmac_pfu] = 0.0
-                    
+
                 product_uom_qty = move.product_uom_qty
                 price_unit = logistic_purchase.price_unit
                 # price_unit = move.price_unit
@@ -225,10 +228,10 @@ class StockPickingInReportWizard(models.TransientModel):
                 subtotal = product_uom_qty * price_unit
                 total['subtotal'][mmac_pfu] += subtotal
                 total['quantity'][mmac_pfu] += product_uom_qty
-                
+
                 if subtotal > 0.0:
                     format_color = format_text['white']
-                else:    
+                else:
                     format_color = format_text['red']
 
                 excel_pool.write_xls_line(ws_name, row, [
@@ -243,21 +246,21 @@ class StockPickingInReportWizard(models.TransientModel):
                     (price_unit, format_color['number']),
                     (subtotal,  format_color['number']),
                     ], default_format=format_color['text'])
-                    
+
             # -----------------------------------------------------------------
             # Write data line:
             # -----------------------------------------------------------------
             # Total
             row += 1
             excel_pool.write_xls_line(ws_name, row, (
-                u'Totale:', 
+                u'Totale:',
                 sum(total['quantity'].values()),
                 '/',
                 sum(total['subtotal'].values()),
                 ), default_format=format_text['green']['number'], col=6)
 
             summary[supplier] = total # save for summary report
-                    
+
         _logger.warning('Supplier found: %s [Moves: %s]' % (
             len(structure),
             len(moves),
@@ -273,11 +276,11 @@ class StockPickingInReportWizard(models.TransientModel):
                 to_date,
                 )
             ], default_format=format_text['title'])
-            
+
         row += 2
         excel_pool.write_xls_line(summary_name, row, [
             'Fornitore', 'Nazione', 'PFU Cat.', 'Pezzi', 'Totale',
-            ], 
+            ],
             default_format=format_text['header'])
         excel_pool.column_width(summary_name, [
             35, 15, 10, 15, 20,
@@ -287,16 +290,16 @@ class StockPickingInReportWizard(models.TransientModel):
             'quantity': {},
             'subtotal': {},
             }
-            
+
         for supplier in sorted(summary, key=lambda x: (x.name if x else '')):
             total = summary[supplier]
             for mmac_pfu in sorted(total['subtotal']): # Use this key same x q.
                 quantity = total['quantity'][mmac_pfu]
                 subtotal = total['subtotal'][mmac_pfu]
-                
+
                 if subtotal:
                     format_color = format_text['white']
-                else:    
+                else:
                     format_color = format_text['red']
 
                 # -------------------------------------------------------------
@@ -308,18 +311,18 @@ class StockPickingInReportWizard(models.TransientModel):
 
                 master_total['quantity'][mmac_pfu] += quantity
                 master_total['subtotal'][mmac_pfu] += subtotal
-                
-                if sort == 'pfu': 
+
+                if sort == 'pfu':
                     row += 1
                     excel_pool.write_xls_line(summary_name, row, [
-                        (supplier.name or '').strip(), 
+                        (supplier.name or '').strip(),
                         supplier.country_id.name,
                         mmac_pfu,
                         (quantity, format_color['number']),
                         (subtotal, format_color['number']),
                         ], default_format=format_color['text'])
 
-            if sort == 'date': 
+            if sort == 'date':
                 row += 1
                 quantity = sum([
                     total['quantity'][key] for key in total['quantity']])
@@ -327,24 +330,24 @@ class StockPickingInReportWizard(models.TransientModel):
                     total['subtotal'][key] for key in total['subtotal']])
                 if subtotal:
                     format_color = format_text['white']
-                else:    
+                else:
                     format_color = format_text['red']
-                
+
                 excel_pool.write_xls_line(summary_name, row, [
-                    (supplier.name or '').strip(), 
+                    (supplier.name or '').strip(),
                     supplier.country_id.name,
                     'Tutte',
                     (quantity, format_color['number']),
                     (subtotal, format_color['number']),
                     ], default_format=format_color['text'])
-            
+
         # -----------------------------------------------------------------
         # Write data line:
         # -----------------------------------------------------------------
         # Total
         if sort == 'pfu':
             for mmac_pfu in sorted(master_total['subtotal']):
-                row += 1            
+                row += 1
 
                 subtotal = master_total['subtotal'][mmac_pfu]
                 quantity = master_total['quantity'][mmac_pfu]
@@ -354,7 +357,7 @@ class StockPickingInReportWizard(models.TransientModel):
                     subtotal,
                     ), default_format=format_text['green']['number'], col=2)
         else: # date report
-            row += 1            
+            row += 1
 
             quantity = sum([
                 master_total['quantity'][key] \
@@ -362,7 +365,7 @@ class StockPickingInReportWizard(models.TransientModel):
             subtotal = sum([
                 master_total['subtotal'][key] \
                     for key in master_total['subtotal']])
-                    
+
             excel_pool.write_xls_line(summary_name, row, (
                 'Totale',
                 quantity,

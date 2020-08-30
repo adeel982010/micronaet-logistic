@@ -761,7 +761,7 @@
                 </field>
             </field>
         </record>-->
-         
+
          <record model="ir.ui.view" id="view_sale_order_line_search">
              <field name="name">sale.order.line.search</field>
              <field name="model">sale.order.line</field>

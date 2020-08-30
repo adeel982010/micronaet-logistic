@@ -40,7 +40,9 @@ class CupsPrinter(models.Model):
 
     
     name = fields.Char('CUPS Printer', size=64)
+    code = fields.Char('Code', size=10, help='For fast reference')
     note = fields.Text('Note')
+    options = fields.Char('CUPS Options', size=100)
     
 
 class ResUsers(models.Model):
